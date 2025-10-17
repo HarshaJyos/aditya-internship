@@ -6,11 +6,12 @@ import * as z from "zod";
 import { useState } from "react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";  // Add Form
+
 
 const assessmentQuestions: Record<string, { 
   name: string; 
@@ -183,15 +184,17 @@ export default function Assessment({ id }: { id: string }) {
     }
   };
 
-  return (
-    <div className="min-h-screen p-4">
-      <Card className="max-w-4xl mx-auto">
-        <CardHeader>
-          <CardTitle>{currentAssessment.name}</CardTitle>
-          <Progress value={progressPercentage} />
-          <p>Question {currentQuestion + 1} of {numQuestions}</p>
-        </CardHeader>
-        <CardContent className="p-6">
+
+return (
+  <div className="min-h-screen p-4">
+    <Card className="max-w-4xl mx-auto">
+      <CardHeader>
+        <CardTitle>{currentAssessment.name}</CardTitle>
+        <Progress value={progressPercentage} />
+        <p>Question {currentQuestion + 1} of {numQuestions}</p>
+      </CardHeader>
+      <CardContent className="p-6">
+        <Form {...form}>  {/* Add this wrapper */}
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField 
               control={form.control} 
@@ -241,8 +244,9 @@ export default function Assessment({ id }: { id: string }) {
               )}
             </div>
           </form>
-        </CardContent>
-      </Card>
-    </div>
-  );
+        </Form>  {/* End wrapper */}
+      </CardContent>
+    </Card>
+  </div>
+);
 }

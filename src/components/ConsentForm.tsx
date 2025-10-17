@@ -6,7 +6,7 @@ import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";  // Add Form here
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -57,74 +57,76 @@ export default function ConsentForm() {
             <p>I understand the results will guide personalized recommendations.</p>
           </div>
           
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField control={form.control} name="name" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Full Name</FormLabel>
-                <FormControl>
-                  <Input {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            
-            <FormField control={form.control} name="rollNumber" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Student ID/Roll Number</FormLabel>
-                <FormControl>
-                  <Input {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            
-            <FormField control={form.control} name="phoneNumber" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Phone Number</FormLabel>
-                <FormControl>
-                  <Input {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            
-            <FormField control={form.control} name="counselorName" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Psychologist</FormLabel>
-                <FormControl>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select psychologist" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Dr. Priya Sharma">Dr. Priya Sharma</SelectItem>
-                      <SelectItem value="Dr. Anil Kumar">Dr. Anil Kumar</SelectItem>
-                      <SelectItem value="Dr. Sarah Wilson">Dr. Sarah Wilson</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            
-            <FormField control={form.control} name="signatureDate" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Date</FormLabel>
-                <FormControl>
-                  <Input 
-                    type="date" 
-                    onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
-                    value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            
-            <Button type="submit" className="w-full bg-blue-600 text-white">
-              Submit Consent & Continue
-            </Button>
-          </form>
+          <Form {...form}>  {/* Add this wrapper */}
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField control={form.control} name="name" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Full Name</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              
+              <FormField control={form.control} name="rollNumber" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Student ID/Roll Number</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              
+              <FormField control={form.control} name="phoneNumber" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone Number</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              
+              <FormField control={form.control} name="counselorName" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Psychologist</FormLabel>
+                  <FormControl>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select psychologist" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Dr. Priya Sharma">Dr. Priya Sharma</SelectItem>
+                        <SelectItem value="Dr. Anil Kumar">Dr. Anil Kumar</SelectItem>
+                        <SelectItem value="Dr. Sarah Wilson">Dr. Sarah Wilson</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              
+              <FormField control={form.control} name="signatureDate" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Date</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="date" 
+                      onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
+                      value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              
+              <Button type="submit" className="w-full bg-blue-600 text-white">
+                Submit Consent & Continue
+              </Button>
+            </form>
+          </Form>  {/* End wrapper */}
         </CardContent>
       </Card>
     </div>
