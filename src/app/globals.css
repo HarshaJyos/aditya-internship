@@ -120,3 +120,23 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* CUSTOM ANIMATIONS FOR BARS */
+.option-bar {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.option-bar:hover {
+  transform: translateY(-2px);
+}
+
+.option-bar.selected {
+  transform: scale(1.05) !important;
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3) !important;
+  animation: pulse 1s ease-in-out;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1.05); }
+  50% { transform: scale(1.08); }
+}
