@@ -15,7 +15,7 @@ export default function LandingPage() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="w-full max-w-4xl">
         <CardHeader className="text-center">
-          <Image src="/logos.webp" alt="Logo" width={100} height={100} className="mx-auto mb-4" />
+          <Image src="/logo.webp" alt="Logo" width={100} height={100} className="mx-auto mb-4" />
           <CardTitle className="text-4xl">Aditya University Counselling</CardTitle>
           <p className="mt-4 text-lg">Supporting Your Mental Well-Being</p>
         </CardHeader>

@@ -1,23 +1,14 @@
 "use client";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useState, useEffect } from "react";
+import { dataManager, type AssessmentScore } from "@/utils/dataManager";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import {
-  Form,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormMessage,
-} from "@/components/ui/form";
-import { Label } from "@/components/ui/label";
+import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
 
 const assessmentQuestions: Record<
   string,
@@ -566,7 +557,6 @@ const likertOptions = [
     color: "bg-green-100 text-green-700 border-green-200",
   },
 ];
-
 type FormValues = { answers: string[] };
 
 export default function Assessment({ id }: { id: string }) {
@@ -574,35 +564,20 @@ export default function Assessment({ id }: { id: string }) {
   const questions = currentAssessment.questions;
   const numQuestions = questions.length;
 
-  const formSchema = z.object({
-    answers: z.array(z.string().min(1)).length(numQuestions),
-  });
-
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(z.object({ answers: z.array(z.string()).length(numQuestions) })),
     defaultValues: { answers: Array(numQuestions).fill("") },
   });
 
-  const searchParams = useSearchParams();
-
-  const selectedAssessments =
-    searchParams.get("selectedAssessments")?.split(",") || [];
-  const currentAssessmentIndex = parseInt(
-    searchParams.get("currentAssessmentIndex") || "0"
-  );
-  const numAssessments = parseInt(searchParams.get("numAssessments") || "0");
-
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
-  const watchedAnswers = form.watch("answers");
-  const answeredQuestions = watchedAnswers.filter((a) => a !== "").length;
-  // ✅ CORRECT PROGRESS: Based on CURRENT QUESTION POSITION
-  const progressPercentage = Math.round(
-    ((currentQuestion + 1) / numQuestions) * 100
-  );
+  // ✅ LOAD USER ID ON MOUNT
+  useEffect(() => {
+    const consentData = JSON.parse(localStorage.getItem("tempConsentData") || "{}");
+    if (consentData.id) setUserId(consentData.id);
+  }, []);
 
-  // ✅ AUTO ADVANCE (1-7)
   const onAnswerChange = (value: string, index: number) => {
     form.setValue(`answers.${index}`, value);
     if (index + 1 < numQuestions) {
@@ -610,202 +585,109 @@ export default function Assessment({ id }: { id: string }) {
     }
   };
 
-  const onSubmit = async (data: FormValues) => {
-    setIsSubmitting(true);
-
-    // Calculate & Save Score
-    const rawScore = data.answers.reduce(
-      (total, answer, index) => total + questions[index].scoring[answer],
-      0
+  // ✅ CALCULATE & SAVE SCORE (PERFECT!)
+  const calculateAndSaveScore = (data: FormValues) => {
+    const rawScore = data.answers.reduce((total, answer, index) => 
+      total + questions[index].scoring[answer], 0
     );
     const minScore = numQuestions * 1;
     const maxScore = numQuestions * 5;
-    const normalizedScore = Math.round(
-      ((rawScore - minScore) / (maxScore - minScore)) * 100
-    );
+    const normalizedScore = Math.round(((rawScore - minScore) / (maxScore - minScore)) * 100);
 
-    const storedScores = JSON.parse(
-      localStorage.getItem("assessmentScores") || "{}"
-    );
-    storedScores[id] = { rawScore, normalizedScore };
-    localStorage.setItem("assessmentScores", JSON.stringify(storedScores));
+    const score: AssessmentScore = {
+      id,
+      rawScore,
+      normalizedScore,
+      date: new Date().toISOString(),
+    };
 
-    // ✅ NEXT/LINK NAVIGATION (FASTER & LIGHTER)
-    const nextIndex = currentAssessmentIndex + 1;
-    if (nextIndex < numAssessments) {
-      const query = new URLSearchParams({
-        name: searchParams.get("name") || "",
-        rollNumber: searchParams.get("rollNumber") || "",
-        phoneNumber: searchParams.get("phoneNumber") || "",
-        counselorName: searchParams.get("counselorName") || "",
-        signatureDate: searchParams.get("signatureDate") || "",
-        selectedAssessments: selectedAssessments.join(","),
-        currentAssessmentIndex: nextIndex.toString(),
-        numAssessments: numAssessments.toString(),
-      }).toString();
-      setTimeout(() => {
-        window.location.href = `/assessment/${selectedAssessments[nextIndex]}?${query}`;
-      }, 1500);
-    } else {
-      const query = new URLSearchParams({
-        name: searchParams.get("name") || "",
-        rollNumber: searchParams.get("rollNumber") || "",
-        phoneNumber: searchParams.get("phoneNumber") || "",
-        counselorName: searchParams.get("counselorName") || "",
-        signatureDate: searchParams.get("signatureDate") || "",
-        hasAssessment: "true",
-      }).toString();
-      setTimeout(() => {
-        window.location.href = `/summary?${query}`;
-      }, 1500);
+    // ✅ SAVE TO PERMANENT STORAGE
+    if (userId) {
+      const users = dataManager.getAllUsers();
+      const user = users.find(u => u.id === userId);
+      if (user) {
+        user.scores[id] = score;
+        dataManager.updateUserScores(userId, user.scores);
+      }
     }
+
+    return normalizedScore;
+  };
+
+  const progressPercentage = Math.round(((currentQuestion + 1) / numQuestions) * 100);
+
+  // ✅ LAST QUESTION - SAVE & GO TO SUMMARY
+  const handleComplete = () => {
+    if (!form.getValues("answers")[currentQuestion]) return;
+    
+    calculateAndSaveScore(form.getValues());
+    window.location.href = `/summary?userId=${userId}`;
   };
 
   return (
     <div className="min-h-screen p-4 bg-gradient-to-br from-blue-50 to-indigo-100">
       <Card className="max-w-4xl mx-auto shadow-xl">
         <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold text-blue-800">
-            {currentAssessment.name}
-          </CardTitle>
+          <CardTitle className="text-3xl font-bold text-blue-800">{currentAssessment.name}</CardTitle>
           <Progress value={progressPercentage} className="w-full h-3 mt-4" />
-          <p className="text-lg mt-2">
-            Question {currentQuestion + 1} of {numQuestions} •
-            {answeredQuestions}/{numQuestions} answered
-          </p>
+          <p className="text-lg mt-2">Question {currentQuestion + 1} of {numQuestions}</p>
         </CardHeader>
         <CardContent className="p-8">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              <FormField
-                control={form.control}
-                name={`answers.${currentQuestion}`}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xl font-semibold text-gray-800 mb-6 text-center">
-                      {currentQuestion + 1}. {questions[currentQuestion].text}
-                    </FormLabel>
-                    <FormControl>
-                      <div className="grid grid-cols-5 gap-4">
-                        {likertOptions.map((opt) => (
-                          <div
-                            key={opt.value}
-                            className={`
-                              p-4 rounded-lg cursor-pointer transition-all duration-300 border-2 
-                              hover:scale-105 ${opt.color} 
-                              ${
-                                field.value === opt.value
-                                  ? "ring-4 ring-blue-500 scale-105 shadow-lg"
-                                  : "hover:shadow-md"
-                              }
-                            `}
-                            onClick={() =>
-                              onAnswerChange(opt.value, currentQuestion)
-                            }
-                          >
-                            <Label
-                              htmlFor={`${currentQuestion}-${opt.value}`}
-                              className="cursor-pointer block text-center font-medium"
-                            >
-                              {opt.label}
-                            </Label>
-                          </div>
-                        ))}
-                      </div>
-                    </FormControl>
-                    <FormMessage className="text-center mt-4" />
-                  </FormItem>
-                )}
-              />
-
-              {/* ✅ LAST QUESTION: BIG GREEN BUTTON - DIRECT SUMMARY (KEEP ORIGINAL onSubmit) */}
-              {currentQuestion === numQuestions - 1 &&
-                !isSubmitting &&
-                watchedAnswers[currentQuestion] !== "" && (
-                  <div className="text-center space-y-4">
-                    <Link
-                      href={`/summary?${new URLSearchParams({
-                        name: searchParams.get("name") || "",
-                        rollNumber: searchParams.get("rollNumber") || "",
-                        phoneNumber: searchParams.get("phoneNumber") || "",
-                        counselorName: searchParams.get("counselorName") || "",
-                        signatureDate: searchParams.get("signatureDate") || "",
-                        hasAssessment: "true",
-                      }).toString()}`}
-                      onClick={(e) => {
-                        // ✅ SAVE SCORE INSTANTLY (SAME AS YOUR ORIGINAL)
-                        const data = form.getValues();
-                        const rawScore = data.answers.reduce(
-                          (total, answer, index) =>
-                            total + questions[index].scoring[answer],
-                          0
-                        );
-                        const minScore = numQuestions * 1;
-                        const maxScore = numQuestions * 5;
-                        const normalizedScore = Math.round(
-                          ((rawScore - minScore) / (maxScore - minScore)) * 100
-                        );
-                        const storedScores = JSON.parse(
-                          localStorage.getItem("assessmentScores") || "{}"
-                        );
-                        storedScores[id] = { rawScore, normalizedScore };
-                        localStorage.setItem(
-                          "assessmentScores",
-                          JSON.stringify(storedScores)
-                        );
-                      }}
-                      className="block w-full"
-                    >
-                      <Button
-                        size="lg"
-                        className="w-full bg-green-600 text-white text-xl py-6 hover:bg-green-700"
-                      >
-                        ✅ Complete Assessment & View Results
-                      </Button>
-                    </Link>
-                    <p className="text-sm text-gray-500">
-                      Click to finish and see your summary!
-                    </p>
-                  </div>
-                )}
-
-              {/* ✅ NAVIGATION (ONLY 1-7) */}
-              {currentQuestion < numQuestions - 1 && !isSubmitting && (
-                <div className="flex justify-between">
-                  <Button
-                    type="button"
-                    onClick={() =>
-                      setCurrentQuestion(Math.max(0, currentQuestion - 1))
-                    }
-                    disabled={currentQuestion === 0}
-                    variant="outline"
-                  >
-                    ← Previous
-                  </Button>
-                  <div className="text-sm text-gray-500">Auto-advancing...</div>
-                  <Button
-                    type="button"
-                    onClick={() =>
-                      setCurrentQuestion(
-                        Math.min(numQuestions - 1, currentQuestion + 1)
-                      )
-                    }
-                    variant="outline"
-                  >
-                    Next →
-                  </Button>
-                </div>
-              )}
-            </form>
+            <FormField 
+              control={form.control} 
+              name={`answers.${currentQuestion}`} 
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xl font-semibold text-gray-800 mb-6 text-center">
+                    {currentQuestion + 1}. {questions[currentQuestion].text}
+                  </FormLabel>
+                  <FormControl>
+                    <div className="grid grid-cols-5 gap-4">
+                      {likertOptions.map((opt) => (
+                        <div 
+                          key={opt.value}
+                          className={`
+                            p-4 rounded-lg cursor-pointer border-2 transition-all 
+                            ${opt.color} 
+                            ${field.value === opt.value ? 'ring-4 ring-blue-500 scale-105 shadow-lg' : ''}
+                          `}
+                          onClick={() => onAnswerChange(opt.value, currentQuestion)}
+                        >
+                          <FormLabel className="cursor-pointer block text-center font-medium">
+                            {opt.label}
+                          </FormLabel>
+                        </div>
+                      ))}
+                    </div>
+                  </FormControl>
+                </FormItem>
+              )} 
+            />
           </Form>
 
-          {/* ✅ LOADING */}
-          {isSubmitting && (
-            <div className="text-center mt-8 p-4 bg-green-50 rounded-lg border border-green-200">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-4"></div>
-              <p className="text-lg font-medium text-green-800">
-                Redirecting to Summary...
-              </p>
+          {/* ✅ BIG GREEN BUTTON - LAST QUESTION */}
+          {currentQuestion === numQuestions - 1 && form.watch(`answers.${currentQuestion}`) && (
+            <div className="text-center space-y-4 mt-8">
+              <Button
+                onClick={handleComplete}
+                size="lg"
+                className="w-full bg-green-600 text-white text-xl py-6 hover:bg-green-700"
+              >
+                ✅ Complete Assessment & View Results
+              </Button>
+            </div>
+          )}
+
+          {/* Navigation for 1-7 */}
+          {currentQuestion < numQuestions - 1 && (
+            <div className="flex justify-between mt-8">
+              <Button type="button" onClick={() => setCurrentQuestion(Math.max(0, currentQuestion - 1))}>
+                ← Previous
+              </Button>
+              <Button type="button" onClick={() => setCurrentQuestion(Math.min(numQuestions - 1, currentQuestion + 1))}>
+                Next →
+              </Button>
             </div>
           )}
         </CardContent>

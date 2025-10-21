@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { dataManager } from '@/utils/dataManager';
 
 const assessments = [
   { id: 'assessment-1', name: 'Social Skills Assessment' },
@@ -27,20 +28,22 @@ export default function SelectAssessments() {
 
   const handleProceed = () => {
     if (selectedAssessments.length === 0) return;
-    const sorted = [...selectedAssessments].sort();
-    const consentData = JSON.parse(localStorage.getItem('consentData') || '{}');
-    const query = new URLSearchParams({
-      name: consentData.name || '',
-      rollNumber: consentData.rollNumber || '',
-      phoneNumber: consentData.phoneNumber || '',
-      counselorName: consentData.counselorName || '',
-      signatureDate: consentData.signatureDate || '',
-      selectedAssessments: sorted.join(','),
-      currentAssessmentIndex: '0',
-      numAssessments: sorted.length.toString(),
-    }).toString();
-    router.push(`/assessment/${sorted[0]}?${query}`);
+    
+    const consentData = JSON.parse(localStorage.getItem('tempConsentData') || '{}');
+    
+    // ✅ CREATE USER IN PERMANENT STORAGE
+    const userId = dataManager.saveUser({
+      ...consentData,
+      scores: {},
+    });
+    
+    // ✅ SAVE USER ID TEMPORARILY
+    localStorage.setItem('tempConsentData', JSON.stringify({ ...consentData, id: userId }));
+    localStorage.setItem('selectedAssessments', JSON.stringify(selectedAssessments.sort()));
+    
+    router.push(`/assessment/${selectedAssessments.sort()[0]}?userId=${userId}`);
   };
+
 
   return (
     <div className="min-h-screen p-4">
@@ -72,3 +75,4 @@ export default function SelectAssessments() {
     </div>
   );
 }
+
