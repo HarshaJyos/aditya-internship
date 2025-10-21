@@ -75,13 +75,11 @@ export default function Summary() {
   useEffect(() => {
     const userId = searchParams.get("userId");
     if (userId) {
-      const users = dataManager.getAllUsers();
-      const foundUser = users.find(u => u.id === userId);
-      setUser(foundUser || null);
-      setIsLoaded(true);
-      
-      localStorage.removeItem("tempConsentData");
-      localStorage.removeItem("selectedAssessments");
+      dataManager.getAllUsers().then(users => {
+        const foundUser = users.find(u => u.id === userId);
+        setUser(foundUser || null);
+        setIsLoaded(true);
+      });
     }
   }, [searchParams]);
 

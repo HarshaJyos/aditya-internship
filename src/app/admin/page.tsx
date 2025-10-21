@@ -40,6 +40,7 @@ const levelColors: Record<PerformanceLevel, string> = {
   "At Risk": "bg-red-100 text-red-800 border-red-300",
 };
 
+// SAME printStyles AS BEFORE
 const logoUrl = "https://adityauniversity.in/static/media/au.f652eed91d8ba58a4968.webp";
 
 
@@ -86,6 +87,7 @@ const printStyles = `
   }
 `;
 
+
 export default function AdminPage() {
   const [users, setUsers] = useState<AssessedUser[]>([]);
   const [filterCounselor, setFilterCounselor] = useState<string>("all");
@@ -93,20 +95,17 @@ export default function AdminPage() {
   const [filterScoreMin, setFilterScoreMin] = useState<number | undefined>(undefined);
   const [filterScoreMax, setFilterScoreMax] = useState<number | undefined>(undefined);
 
-  // ✅ LOAD + DEBUG
+  // ✅ FIREBASE LOAD + DEBUG
   useEffect(() => {
-    console.log("🔄 Loading users...");
-    const loadedUsers = dataManager.getAllUsers();
-    console.log("📊 Loaded:", loadedUsers.length);
-    setUsers(loadedUsers);
+    dataManager.getAllUsers().then(loadedUsers => {
+      setUsers(loadedUsers);
+    });
   }, []);
 
-  // ✅ DYNAMIC COUNSELORS
   const uniqueCounselors = useMemo(() => {
     return Array.from(new Set(users.map(user => user.counselorName))).sort();
   }, [users]);
 
-  // ✅ FIXED FILTER LOGIC (HANDLE UNDEFINED MIN/MAX)
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
       const scores = Object.values(user.scores);
@@ -132,8 +131,7 @@ export default function AdminPage() {
           <div class="print-page-break"></div>
           <div class="print-section">
             <div class="print-header">
-              <div class="print-logo">
-              <img src="${logoUrl}" style="width:100%;height:100%;object-fit:contain;" /></div>
+              <div class="print-logo"><img src="/logo.jpeg" style="width:100%;height:100%;object-fit:contain;" /></div>
               <div class="print-title">STUDENT COUNSELING REPORT</div>
               <div class="print-subtitle">ADITYA UNIVERSITY, SURAMPALEM</div>
             </div>
@@ -149,70 +147,10 @@ export default function AdminPage() {
               <thead><tr><th>Assessment</th><th style="text-align:center;">Score</th><th>Level</th></tr></thead>
               <tbody>${Object.entries(user.scores).map(([id, scoreData]) => `<tr><td>${assessmentNames[id]}</td><td style="text-align:center;">${scoreData.normalizedScore}/100</td><td>${getPerformanceLevel(scoreData.normalizedScore)}</td></tr>`).join("")}</tbody>
             </table>
-            <div class="print-page-break"></div>
-          <!-- FULL CONSENT FORM -->
-              <div class="print-section">
-                <div class="print-section-title">INFORMED CONSENT FOR COUNSELING SERVICES</div>
-                <div class="print-consent-text">
-                  At Aditya University, we prioritize both your physical and mental well-being. For your physical health, we have partnered with Apollo, and for your mental well-being, our dedicated student counselors are here to support you. The University Counselling Centre at Surampalem provides a safe and confidential space for all students to explore personal concerns, develop coping strategies, and enhance overall well-being. You can attend multiple counseling sessions as per your wish.
-                </div>
-                <div class="print-important-text">
-                  Please sign this form only if you understand and agree with the information.
-                </div>
-
-                <div class="print-section-title">Welcome to Aditya University, Surampalem</div>
-                <div class="print-consent-text"><strong>What We Offer:</strong></div>
-                <ul class="print-list">
-                  <li>Individual counseling sessions</li>
-                  <li>Group therapy opportunities</li>
-                  <li>Workshops to enhance your skills</li>
-                </ul>
-
-                <div class="print-section-title">What is Counseling Support?</div>
-                <div class="print-consent-text">
-                  Counseling at the University Counselling Centre is a friendly and supportive space where you can share your thoughts, explore personal concerns, and develop strategies to enhance your well-being.
-                </div>
-                <div class="print-consent-text"><strong>Why It Helps:</strong></div>
-                <ul class="print-list">
-                  <li>Build confidence and coping skills</li>
-                  <li>Navigate academic and personal challenges</li>
-                  <li>Feel supported in a safe environment</li>
-                </ul>
-
-                <div class="print-section-title">Your Role in Counseling</div>
-                <ul class="print-list">
-                  <li>Attend sessions at your convenience</li>
-                  <li>Share your experiences for tailored support</li>
-                  <li>Let your counselor know if you need a different approach</li>
-                </ul>
-
-                <div class="print-section-title">Keeping Your Conversations Private</div>
-                <div class="print-consent-text">
-                  Everything you discuss is kept confidential, creating a safe space for you to open up.
-                </div>
-                <div class="print-consent-text"><strong>When We May Share:</strong></div>
-                <ul class="print-list">
-                  <li>If there's risk of harm to you or others</li>
-                  <li>With your permission, to university staff</li>
-                </ul>
-
-                <!-- ✅ FIXED SIGNATURE - TEXT ONLY -->
-                <div class="print-signature-text">
-                  Signature: ${user.name}
-                </div>
-              </div>
-
-              <!-- FOOTER -->
-              <div style="margin-top:15mm;text-align:center;font-size:9pt;color:#6b7280;border-top:1px solid #d1d5db;padding-top:5mm;">
-                <div><strong>Aditya University Counselling Centre</strong></div>
-                <div>Surampalem, Andhra Pradesh | Phone: (123) 456-7890</div>
-                <div>Email: counseling@adityauniversity.edu</div>
-                <div style="margin-top:2mm;font-weight:bold;">This document contains confidential information</div>
-              </div>
-            </div>
-           `;
+            <div class="print-signature-text">Signature: ${user.name}</div>
+          </div>`;
       });
-      content += `</body></html>`;
+      content += `<div style="margin-top:15mm;text-align:center;font-size:9pt;color:#6b7280;border-top:1px solid #d1d5db;padding-top:5mm;"><strong>Aditya University Counselling Centre</strong></div></div></body></html>`;
       printWindow.document.write(content);
       printWindow.document.close();
       printWindow.print();
@@ -226,8 +164,7 @@ export default function AdminPage() {
         <html><head><title>Report</title><style>${printStyles}</style></head>
         <body><div class="print-content">
           <div class="print-header">
-            <div class="print-logo">
-            <img src="${logoUrl}" style="width:100%;height:100%;object-fit:contain;" /></div>
+            <div class="print-logo"><img src="/logo.jpeg" style="width:100%;height:100%;object-fit:contain;" /></div>
             <div class="print-title">INFORMED CONSENT & SUMMARY REPORT</div>
             <div class="print-subtitle">ADITYA UNIVERSITY, SURAMPALEM</div>
           </div>
@@ -247,74 +184,19 @@ export default function AdminPage() {
             </table>
           </div>
           <div class="print-page-break"></div>
-          <!-- FULL CONSENT FORM -->
-              <div class="print-section">
-                <div class="print-section-title">INFORMED CONSENT FOR COUNSELING SERVICES</div>
-                <div class="print-consent-text">
-                  At Aditya University, we prioritize both your physical and mental well-being. For your physical health, we have partnered with Apollo, and for your mental well-being, our dedicated student counselors are here to support you. The University Counselling Centre at Surampalem provides a safe and confidential space for all students to explore personal concerns, develop coping strategies, and enhance overall well-being. You can attend multiple counseling sessions as per your wish.
-                </div>
-                <div class="print-important-text">
-                  Please sign this form only if you understand and agree with the information.
-                </div>
-
-                <div class="print-section-title">Welcome to Aditya University, Surampalem</div>
-                <div class="print-consent-text"><strong>What We Offer:</strong></div>
-                <ul class="print-list">
-                  <li>Individual counseling sessions</li>
-                  <li>Group therapy opportunities</li>
-                  <li>Workshops to enhance your skills</li>
-                </ul>
-
-                <div class="print-section-title">What is Counseling Support?</div>
-                <div class="print-consent-text">
-                  Counseling at the University Counselling Centre is a friendly and supportive space where you can share your thoughts, explore personal concerns, and develop strategies to enhance your well-being.
-                </div>
-                <div class="print-consent-text"><strong>Why It Helps:</strong></div>
-                <ul class="print-list">
-                  <li>Build confidence and coping skills</li>
-                  <li>Navigate academic and personal challenges</li>
-                  <li>Feel supported in a safe environment</li>
-                </ul>
-
-                <div class="print-section-title">Your Role in Counseling</div>
-                <ul class="print-list">
-                  <li>Attend sessions at your convenience</li>
-                  <li>Share your experiences for tailored support</li>
-                  <li>Let your counselor know if you need a different approach</li>
-                </ul>
-
-                <div class="print-section-title">Keeping Your Conversations Private</div>
-                <div class="print-consent-text">
-                  Everything you discuss is kept confidential, creating a safe space for you to open up.
-                </div>
-                <div class="print-consent-text"><strong>When We May Share:</strong></div>
-                <ul class="print-list">
-                  <li>If there's risk of harm to you or others</li>
-                  <li>With your permission, to university staff</li>
-                </ul>
-
-                <!-- ✅ FIXED SIGNATURE - TEXT ONLY -->
-                <div class="print-signature-text">
-                  Signature: ${user.name}
-                </div>
-              </div>
-
-              <!-- FOOTER -->
-              <div style="margin-top:15mm;text-align:center;font-size:9pt;color:#6b7280;border-top:1px solid #d1d5db;padding-top:5mm;">
-                <div><strong>Aditya University Counselling Centre</strong></div>
-                <div>Surampalem, Andhra Pradesh | Phone: (123) 456-7890</div>
-                <div>Email: counseling@adityauniversity.edu</div>
-                <div style="margin-top:2mm;font-weight:bold;">This document contains confidential information</div>
-              </div>
-            </div>
-            </body></html>`);
+          <div class="print-section">
+            <div class="print-section-title">INFORMED CONSENT</div>
+            <div class="print-consent-text">At Aditya University, we prioritize your well-being...</div>
+            <div class="print-signature-text">Signature: ${user.name}</div>
+          </div>
+        </div></body></html>`);
       printWindow.document.close();
       printWindow.print();
     }
   };
 
-  const handleRefresh = () => {
-    const loadedUsers = dataManager.getAllUsers();
+  const handleRefresh = async () => {
+    const loadedUsers = await dataManager.getAllUsers();
     setUsers(loadedUsers);
   };
 

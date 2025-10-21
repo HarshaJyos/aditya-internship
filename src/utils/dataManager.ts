@@ -1,4 +1,6 @@
-// ✅ PERFECT DATA MANAGEMENT - SINGLE SOURCE OF TRUTH
+import { db } from "@/firebase";
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc} from "firebase/firestore";
+
 export interface AssessmentScore {
   id: string;
   rawScore: number;
@@ -18,69 +20,34 @@ export interface AssessedUser {
 }
 
 class DataManager {
-  private STORAGE_KEY = "assessedUsers";
+  private COLLECTION = "assessedUsers";
 
-  // ✅ SAFE PARSE - NEVER FAILS
-  private safeParse(): AssessedUser[] {
-    try {
-      const stored = localStorage.getItem(this.STORAGE_KEY);
-      console.log("🗄️ LocalStorage raw:", stored?.substring(0, 100) + "..."); // DEBUG
-      if (!stored) return [];
-      
-      const parsed = JSON.parse(stored);
-      console.log("✅ Parsed users:", parsed.length); // DEBUG
-      
-      // ✅ VALIDATE STRUCTURE
-      return Array.isArray(parsed) 
-        ? parsed.filter((user): user is AssessedUser => 
-            user && 
-            typeof user.id === 'string' && 
-            typeof user.name === 'string' && 
-            Object.keys(user.scores).length > 0
-          )
-        : [];
-    } catch (error) {
-      console.error("❌ Parse error:", error);
-      return [];
-    }
-  }
-
-  // ✅ SAVE COMPLETE USER (FOREVER)
-  saveUser(user: Omit<AssessedUser, 'id'>): string {
-    const users = this.safeParse();
-    const newUser: AssessedUser = {
+  // ✅ SAVE USER (FIREBASE)
+  async saveUser(user: Omit<AssessedUser, 'id'>): Promise<string> {
+    const docRef = await addDoc(collection(db, this.COLLECTION), {
       ...user,
-      id: Date.now().toString(),
+      scores: {},
       dateCompleted: new Date().toISOString(),
-    };
-    users.push(newUser);
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(users));
-    console.log("💾 Saved user:", newUser.id); // DEBUG
-    return newUser.id;
+    });
+    return docRef.id;
   }
 
-  // ✅ GET ALL USERS (FOREVER) - SAFE
-  getAllUsers(): AssessedUser[] {
-    const users = this.safeParse();
-    console.log("📋 Final users:", users.length, users.map(u => ({id: u.id, name: u.name}))); // DEBUG
-    return users;
+  // ✅ GET ALL USERS (FIREBASE)
+  async getAllUsers(): Promise<AssessedUser[]> {
+    const snapshot = await getDocs(collection(db, this.COLLECTION));
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as AssessedUser));
   }
 
-  // ✅ UPDATE USER SCORES
-  updateUserScores(userId: string, scores: Record<string, AssessmentScore>) {
-    const users = this.safeParse();
-    const userIndex = users.findIndex(u => u.id === userId);
-    if (userIndex !== -1) {
-      users[userIndex].scores = scores;
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(users));
-      console.log("🔄 Updated scores for:", userId); // DEBUG
-    }
+  // ✅ UPDATE SCORES (FIREBASE)
+  async updateUserScores(userId: string, scores: Record<string, AssessmentScore>) {
+    await updateDoc(doc(db, this.COLLECTION, userId), { scores });
   }
 
-  // ✅ CLEAR ALL (ADMIN ONLY)
-  clearAll() {
-    localStorage.removeItem(this.STORAGE_KEY);
-    console.log("🗑️ Cleared all data"); // DEBUG
+  // ✅ CLEAR ALL (FIREBASE)
+  async clearAll() {
+    const snapshot = await getDocs(collection(db, this.COLLECTION));
+    const promises = snapshot.docs.map(d => deleteDoc(d.ref));
+    await Promise.all(promises);
   }
 }
 

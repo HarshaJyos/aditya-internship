@@ -1,15 +1,11 @@
+
 "use client";
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Image from 'next/image';
+import Link from 'next/link';
 
 export default function LandingPage() {
-  const router = useRouter();
 
-  const handleGetStarted = () => {
-    router.push('/consent');
-  };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -21,11 +17,13 @@ export default function LandingPage() {
         </CardHeader>
         <CardContent className="text-center">
           <p className="text-xl mb-8">Welcome to our assessment platform for students.</p>
-          <Button onClick={handleGetStarted} className="bg-blue-600 text-white">
+          <Link href="/consent" className="no-underline bg-blue-600 text-white">
             Get Started
-          </Button>
+          </Link>
         </CardContent>
       </Card>
     </div>
   );
 }
+
+

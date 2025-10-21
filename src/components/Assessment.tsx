@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useState, useEffect } from "react";
 import { dataManager, type AssessmentScore } from "@/utils/dataManager";
+import { useRouter } from "next/navigation";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -569,14 +570,22 @@ export default function Assessment({ id }: { id: string }) {
     defaultValues: { answers: Array(numQuestions).fill("") },
   });
 
+  const router = useRouter();
   const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [selectedAssessments, setSelectedAssessments] = useState<string[]>([]);
+  const [currentAssessmentIndex, setCurrentAssessmentIndex] = useState(0);
+  const [numAssessments, setNumAssessments] = useState(0);
 
-  // ✅ LOAD USER ID ON MOUNT
   useEffect(() => {
-    const consentData = JSON.parse(localStorage.getItem("tempConsentData") || "{}");
-    if (consentData.id) setUserId(consentData.id);
-  }, []);
+    const storedUserId = localStorage.getItem('tempUserId');
+    const storedSelected = JSON.parse(localStorage.getItem('tempSelectedAssessments') || "[]");
+    setUserId(storedUserId);
+    setSelectedAssessments(storedSelected);
+    setNumAssessments(storedSelected.length);
+    setCurrentAssessmentIndex(storedSelected.indexOf(id));
+  }, [id]);
 
   const onAnswerChange = (value: string, index: number) => {
     form.setValue(`answers.${index}`, value);
@@ -585,8 +594,7 @@ export default function Assessment({ id }: { id: string }) {
     }
   };
 
-  // ✅ CALCULATE & SAVE SCORE (PERFECT!)
-  const calculateAndSaveScore = (data: FormValues) => {
+  const calculateAndSaveScore = async (data: FormValues) => {
     const rawScore = data.answers.reduce((total, answer, index) => 
       total + questions[index].scoring[answer], 0
     );
@@ -601,27 +609,26 @@ export default function Assessment({ id }: { id: string }) {
       date: new Date().toISOString(),
     };
 
-    // ✅ SAVE TO PERMANENT STORAGE
-    if (userId) {
-      const users = dataManager.getAllUsers();
-      const user = users.find(u => u.id === userId);
-      if (user) {
-        user.scores[id] = score;
-        dataManager.updateUserScores(userId, user.scores);
-      }
-    }
+    // ✅ SAVE TO FIREBASE
+    await dataManager.updateUserScores(userId!, { [id]: score });
 
     return normalizedScore;
   };
 
   const progressPercentage = Math.round(((currentQuestion + 1) / numQuestions) * 100);
 
-  // ✅ LAST QUESTION - SAVE & GO TO SUMMARY
-  const handleComplete = () => {
+  const handleComplete = async () => {
     if (!form.getValues("answers")[currentQuestion]) return;
+    setIsSubmitting(true);
     
-    calculateAndSaveScore(form.getValues());
-    window.location.href = `/summary?userId=${userId}`;
+    await calculateAndSaveScore(form.getValues());
+    const nextIndex = currentAssessmentIndex + 1;
+    
+    if (nextIndex < numAssessments) {
+      router.push(`/assessment/${selectedAssessments[nextIndex]}`);
+    } else {
+      router.push('/summary');
+    }
   };
 
   return (
@@ -666,8 +673,7 @@ export default function Assessment({ id }: { id: string }) {
             />
           </Form>
 
-          {/* ✅ BIG GREEN BUTTON - LAST QUESTION */}
-          {currentQuestion === numQuestions - 1 && form.watch(`answers.${currentQuestion}`) && (
+          {currentQuestion === numQuestions - 1 && form.watch(`answers.${currentQuestion}`) && !isSubmitting && (
             <div className="text-center space-y-4 mt-8">
               <Button
                 onClick={handleComplete}
@@ -679,7 +685,6 @@ export default function Assessment({ id }: { id: string }) {
             </div>
           )}
 
-          {/* Navigation for 1-7 */}
           {currentQuestion < numQuestions - 1 && (
             <div className="flex justify-between mt-8">
               <Button type="button" onClick={() => setCurrentQuestion(Math.max(0, currentQuestion - 1))}>
@@ -688,6 +693,13 @@ export default function Assessment({ id }: { id: string }) {
               <Button type="button" onClick={() => setCurrentQuestion(Math.min(numQuestions - 1, currentQuestion + 1))}>
                 Next →
               </Button>
+            </div>
+          )}
+
+          {isSubmitting && (
+            <div className="text-center mt-8 p-4 bg-blue-50 rounded-lg">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-lg font-medium text-blue-800">Saving & Redirecting...</p>
             </div>
           )}
         </CardContent>

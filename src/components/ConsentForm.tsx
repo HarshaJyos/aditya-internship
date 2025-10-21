@@ -116,10 +116,11 @@ export default function ConsentForm() {
       ...data,
       signatureDate: format(data.signatureDate, "MM/dd/yyyy"),
     };
-    // ✅ TEMP STORAGE (PERFECT FLOW)
+    // ✅ TEMP STORAGE
     localStorage.setItem("tempConsentData", JSON.stringify(submitData));
     router.push('/select-assessments');
   };
+
 
   return (
     <div className="min-h-screen p-6 bg-white">
