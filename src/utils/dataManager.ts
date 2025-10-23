@@ -1,6 +1,5 @@
-// src/utils/dataManager.ts
 import { db, auth, isAuthReady } from "@/firebase";
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 
 export interface AssessmentScore {
@@ -17,6 +16,7 @@ export interface AssessedUser {
   phoneNumber: string;
   counselorName: string;
   signatureDate: string;
+  selectedAssessments: string[]; // NEW - Store selected here
   scores: Record<string, AssessmentScore>;
   dateCompleted: string;
 }
@@ -24,29 +24,28 @@ export interface AssessedUser {
 class DataManager {
   private COLLECTION = "assessedUsers";
 
-  // Wait for auth before operations
   private async waitForAuth() {
-    return new Promise((resolve) => {
-      if (isAuthReady) return resolve(true);
-      const unsubscribe = onAuthStateChanged(auth, () => {
-        if (isAuthReady) {
+    return new Promise<void>((resolve) => {
+      if (isAuthReady) return resolve();
+      const unsubscribe = onAuthStateChanged(auth, (user) => {
+        if (user || isAuthReady) {
           unsubscribe();
-          resolve(true);
+          resolve();
         }
       });
     });
   }
 
-  // SAVE USER
   async saveUser(user: Omit<AssessedUser, 'id'>): Promise<string> {
     await this.waitForAuth();
     try {
       const docRef = await addDoc(collection(db, this.COLLECTION), {
         ...user,
+        selectedAssessments: [],
         scores: {},
         dateCompleted: new Date().toISOString(),
       });
-      console.log("✅ Saved user:", docRef.id);
+      console.log("💾 Saved user:", docRef.id);
       return docRef.id;
     } catch (error) {
       console.error("❌ Error saving user:", error);
@@ -54,33 +53,54 @@ class DataManager {
     }
   }
 
-  // GET ALL USERS
   async getAllUsers(): Promise<AssessedUser[]> {
     await this.waitForAuth();
     try {
       const snapshot = await getDocs(collection(db, this.COLLECTION));
-      const users = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as AssessedUser));
-      console.log("✅ Loaded users:", users.length);
-      return users;
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as AssessedUser));
     } catch (error) {
       console.error("❌ Error fetching users:", error);
       return [];
     }
   }
 
-  // UPDATE SCORES
-  async updateUserScores(userId: string, scores: Record<string, AssessmentScore>) {
+  async getUserById(userId: string): Promise<AssessedUser | null> {
     await this.waitForAuth();
     try {
-      await updateDoc(doc(db, this.COLLECTION, userId), { scores });
-      console.log("✅ Updated scores for:", userId);
+      const userDoc = await getDoc(doc(db, this.COLLECTION, userId));
+      if (userDoc.exists()) {
+        return { id: userDoc.id, ...userDoc.data() } as AssessedUser;
+      }
+      return null;
+    } catch (error) {
+      console.error("❌ Error fetching user:", error);
+      return null;
+    }
+  }
+
+  async updateUserScores(userId: string, assessmentId: string, score: AssessmentScore) {
+    await this.waitForAuth();
+    try {
+      const userRef = doc(db, this.COLLECTION, userId);
+      await updateDoc(userRef, { [`scores.${assessmentId}`]: score });
+      console.log("✅ Updated score for assessment:", assessmentId);
     } catch (error) {
       console.error("❌ Error updating scores:", error);
       throw error;
     }
   }
 
-  // CLEAR ALL
+  async updateSelectedAssessments(userId: string, selected: string[]) {
+    await this.waitForAuth();
+    try {
+      await updateDoc(doc(db, this.COLLECTION, userId), { selectedAssessments: selected });
+      console.log("✅ Updated selected assessments");
+    } catch (error) {
+      console.error("❌ Error updating selected:", error);
+      throw error;
+    }
+  }
+
   async clearAll() {
     await this.waitForAuth();
     try {

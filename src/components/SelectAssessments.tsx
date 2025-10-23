@@ -1,6 +1,6 @@
 "use client";
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -19,6 +19,8 @@ const assessments = [
 export default function SelectAssessments() {
   const [selectedAssessments, setSelectedAssessments] = useState<string[]>([]);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const userId = searchParams.get('userId');
 
   const handleCheckboxChange = (id: string) => {
     setSelectedAssessments(prev => 
@@ -27,26 +29,14 @@ export default function SelectAssessments() {
   };
 
   const handleProceed = async () => {
-    if (selectedAssessments.length === 0) return;
+    if (selectedAssessments.length === 0 || !userId) return;
     
-    const consentData = JSON.parse(localStorage.getItem('tempConsentData') || '{}');
-    
-    // ✅ SAVE TO FIREBASE
-    const userId = await dataManager.saveUser({
-      name: consentData.name,
-      rollNumber: consentData.rollNumber,
-      phoneNumber: consentData.phoneNumber,
-      counselorName: consentData.counselorName,
-      signatureDate: consentData.signatureDate,
-      scores: {},
-      dateCompleted: new Date().toISOString(),
-    });
-    
-    // ✅ SAVE USER ID TEMP
-    localStorage.setItem('tempUserId', userId);
-    localStorage.setItem('tempSelectedAssessments', JSON.stringify(selectedAssessments.sort()));
-    
-    router.push(`/assessment/${selectedAssessments.sort()[0]}`);
+    try {
+      await dataManager.updateSelectedAssessments(userId, selectedAssessments.sort());
+      router.push(`/assessment/${selectedAssessments.sort()[0]}?userId=${userId}`);
+    } catch (error) {
+      console.error("❌ Error updating selected:", error);
+    }
   };
 
 
@@ -80,5 +70,3 @@ export default function SelectAssessments() {
     </div>
   );
 }
-
-

@@ -75,11 +75,12 @@ export default function Summary() {
   useEffect(() => {
     const userId = searchParams.get("userId");
     if (userId) {
-      dataManager.getAllUsers().then(users => {
-        const foundUser = users.find(u => u.id === userId);
-        setUser(foundUser || null);
+      dataManager.getUserById(userId).then(foundUser => {
+        setUser(foundUser);
         setIsLoaded(true);
       });
+    } else {
+      setIsLoaded(true);
     }
   }, [searchParams]);
 

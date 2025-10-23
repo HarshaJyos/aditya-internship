@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { dataManager } from "@/utils/dataManager";
 
 const formSchema = z.object({
   name: z.string().min(2, "Please enter your full name"),
@@ -111,14 +112,25 @@ export default function ConsentForm() {
     },
   });
 
-  const onSubmit = (data: FormValues) => {
+  const onSubmit = async (data: FormValues) => {
     const submitData = {
-      ...data,
+      name: data.name,
+      rollNumber: data.rollNumber,
+      phoneNumber: data.phoneNumber,
+      counselorName: data.counselorName,
       signatureDate: format(data.signatureDate, "MM/dd/yyyy"),
+      // Add properties required by saveUser / AssessedUser (omitting id)
+      selectedAssessments: [],
+      scores: {},
+      dateCompleted: new Date().toISOString(),
     };
-    // ✅ TEMP STORAGE
-    localStorage.setItem("tempConsentData", JSON.stringify(submitData));
-    router.push('/select-assessments');
+    try {
+      const userId = await dataManager.saveUser(submitData);
+      router.push(`/select-assessments?userId=${userId}`);
+    } catch (error) {
+      console.error("❌ Error saving consent:", error);
+      // Handle error (e.g., show toast)
+    }
   };
 
 

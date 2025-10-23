@@ -9,7 +9,15 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
+import {
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+} from "@/components/ui/form";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "@/firebase";
 
 const assessmentQuestions: Record<
   string,
@@ -559,7 +567,6 @@ const likertOptions = [
   },
 ];
 
-
 type FormValues = { answers: string[] };
 
 export default function Assessment({ id }: { id: string }) {
@@ -568,7 +575,9 @@ export default function Assessment({ id }: { id: string }) {
   const numQuestions = questions.length;
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(z.object({ answers: z.array(z.string()).length(numQuestions) })),
+    resolver: zodResolver(
+      z.object({ answers: z.array(z.string()).length(numQuestions) })
+    ),
     defaultValues: { answers: Array(numQuestions).fill("") },
   });
 
@@ -580,14 +589,21 @@ export default function Assessment({ id }: { id: string }) {
   const [numAssessments, setNumAssessments] = useState(0);
   const router = useRouter();
 
-  useEffect(() => {
+  // Assessment.tsx – useEffect
+useEffect(() => {
+  const init = async () => {
+    await import("@/firebase").then(m => m.isAuthReady ? null : new Promise<void>(r => {
+      const unsub = onAuthStateChanged(auth, () => { unsub(); r(); });
+    }));
     const storedUserId = localStorage.getItem('tempUserId');
     const storedSelected = JSON.parse(localStorage.getItem('tempSelectedAssessments') || "[]");
     setUserId(storedUserId);
     setSelectedAssessments(storedSelected);
     setNumAssessments(storedSelected.length);
     setCurrentAssessmentIndex(storedSelected.indexOf(id));
-  }, [id]);
+  };
+  init();
+}, [id]);
 
   const onAnswerChange = (value: string, index: number) => {
     form.setValue(`answers.${index}`, value);
@@ -597,12 +613,15 @@ export default function Assessment({ id }: { id: string }) {
   };
 
   const calculateAndSaveScore = async (data: FormValues) => {
-    const rawScore = data.answers.reduce((total, answer, index) => 
-      total + questions[index].scoring[answer], 0
+    const rawScore = data.answers.reduce(
+      (total, answer, index) => total + questions[index].scoring[answer],
+      0
     );
     const minScore = numQuestions * 1;
     const maxScore = numQuestions * 5;
-    const normalizedScore = Math.round(((rawScore - minScore) / (maxScore - minScore)) * 100);
+    const normalizedScore = Math.round(
+      ((rawScore - minScore) / (maxScore - minScore)) * 100
+    );
 
     const score: AssessmentScore = {
       id,
@@ -617,19 +636,28 @@ export default function Assessment({ id }: { id: string }) {
     return normalizedScore;
   };
 
-  const progressPercentage = Math.round(((currentQuestion + 1) / numQuestions) * 100);
+  const progressPercentage = Math.round(
+    ((currentQuestion + 1) / numQuestions) * 100
+  );
 
   const handleComplete = async () => {
     if (!form.getValues("answers")[currentQuestion]) return;
+    if (!userId) {
+      console.error("No userId – cannot save score");
+      // Optionally redirect to consent
+      router.push("/consent");
+      return;
+    }
     setIsSubmitting(true);
-    
+    await calculateAndSaveScore(form.getValues());
+
     await calculateAndSaveScore(form.getValues());
     const nextIndex = currentAssessmentIndex + 1;
-    
+
     if (nextIndex < numAssessments) {
       router.push(`/assessment/${selectedAssessments[nextIndex]}`);
     } else {
-      router.push('/summary');
+      router.push("/summary");
     }
   };
 
@@ -637,15 +665,19 @@ export default function Assessment({ id }: { id: string }) {
     <div className="min-h-screen p-4 bg-gradient-to-br from-blue-50 to-indigo-100">
       <Card className="max-w-4xl mx-auto shadow-xl">
         <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold text-blue-800">{currentAssessment.name}</CardTitle>
+          <CardTitle className="text-3xl font-bold text-blue-800">
+            {currentAssessment.name}
+          </CardTitle>
           <Progress value={progressPercentage} className="w-full h-3 mt-4" />
-          <p className="text-lg mt-2">Question {currentQuestion + 1} of {numQuestions}</p>
+          <p className="text-lg mt-2">
+            Question {currentQuestion + 1} of {numQuestions}
+          </p>
         </CardHeader>
         <CardContent className="p-8">
           <Form {...form}>
-            <FormField 
-              control={form.control} 
-              name={`answers.${currentQuestion}`} 
+            <FormField
+              control={form.control}
+              name={`answers.${currentQuestion}`}
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-xl font-semibold text-gray-800 mb-6 text-center">
@@ -654,14 +686,20 @@ export default function Assessment({ id }: { id: string }) {
                   <FormControl>
                     <div className="grid grid-cols-5 gap-4">
                       {likertOptions.map((opt) => (
-                        <div 
+                        <div
                           key={opt.value}
                           className={`
                             p-4 rounded-lg cursor-pointer border-2 transition-all 
                             ${opt.color} 
-                            ${field.value === opt.value ? 'ring-4 ring-blue-500 scale-105 shadow-lg' : ''}
+                            ${
+                              field.value === opt.value
+                                ? "ring-4 ring-blue-500 scale-105 shadow-lg"
+                                : ""
+                            }
                           `}
-                          onClick={() => onAnswerChange(opt.value, currentQuestion)}
+                          onClick={() =>
+                            onAnswerChange(opt.value, currentQuestion)
+                          }
                         >
                           <FormLabel className="cursor-pointer block text-center font-medium">
                             {opt.label}
@@ -671,28 +709,42 @@ export default function Assessment({ id }: { id: string }) {
                     </div>
                   </FormControl>
                 </FormItem>
-              )} 
+              )}
             />
           </Form>
 
-          {currentQuestion === numQuestions - 1 && form.watch(`answers.${currentQuestion}`) && !isSubmitting && (
-            <div className="text-center space-y-4 mt-8">
-              <Button
-                onClick={handleComplete}
-                size="lg"
-                className="w-full bg-green-600 text-white text-xl py-6 hover:bg-green-700"
-              >
-                ✅ Complete Assessment & View Results
-              </Button>
-            </div>
-          )}
+          {currentQuestion === numQuestions - 1 &&
+            form.watch(`answers.${currentQuestion}`) &&
+            !isSubmitting && (
+              <div className="text-center space-y-4 mt-8">
+                <Button
+                  onClick={handleComplete}
+                  size="lg"
+                  className="w-full bg-green-600 text-white text-xl py-6 hover:bg-green-700"
+                >
+                  ✅ Complete Assessment & View Results
+                </Button>
+              </div>
+            )}
 
           {currentQuestion < numQuestions - 1 && (
             <div className="flex justify-between mt-8">
-              <Button type="button" onClick={() => setCurrentQuestion(Math.max(0, currentQuestion - 1))}>
+              <Button
+                type="button"
+                onClick={() =>
+                  setCurrentQuestion(Math.max(0, currentQuestion - 1))
+                }
+              >
                 ← Previous
               </Button>
-              <Button type="button" onClick={() => setCurrentQuestion(Math.min(numQuestions - 1, currentQuestion + 1))}>
+              <Button
+                type="button"
+                onClick={() =>
+                  setCurrentQuestion(
+                    Math.min(numQuestions - 1, currentQuestion + 1)
+                  )
+                }
+              >
                 Next →
               </Button>
             </div>
@@ -701,7 +753,9 @@ export default function Assessment({ id }: { id: string }) {
           {isSubmitting && (
             <div className="text-center mt-8 p-4 bg-blue-50 rounded-lg">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-lg font-medium text-blue-800">Saving & Redirecting...</p>
+              <p className="text-lg font-medium text-blue-800">
+                Saving & Redirecting...
+              </p>
             </div>
           )}
         </CardContent>
