@@ -1,9 +1,10 @@
 // src/firebase.ts
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getAuth, signInAnonymously } from "firebase/auth";
+import { getAuth } from "firebase/auth";
+import { signInAnonymously } from "firebase/auth";
 
-// Firebase configuration
+// Your Firebase config (from Console)
 const firebaseConfig = {
   apiKey: "AIzaSyAjVpOn5eQYwfyWixT3ymKvpvTraDwI6C0",
   authDomain: "psychologist-c3836.firebaseapp.com",
@@ -19,7 +20,17 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 
-// Initialize anonymous authentication
+// ✅ Anonymous Auth (async - wait for it!)
+let isAuthReady = false;
 signInAnonymously(auth)
-  .then(() => console.log("✅ Anonymous auth success"))
-  .catch(error => console.error("❌ Auth error:", error));
+  .then((userCredential) => {
+    console.log("✅ Anonymous auth success:", userCredential.user.uid);
+    isAuthReady = true;
+  })
+  .catch((error) => {
+    console.error("❌ Auth error:", error);
+    isAuthReady = true; // Continue even if auth fails (for testing)
+  });
+
+// ✅ Export with auth check
+export { app, isAuthReady };
