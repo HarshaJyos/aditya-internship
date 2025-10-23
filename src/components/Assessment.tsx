@@ -558,6 +558,8 @@ const likertOptions = [
     color: "bg-green-100 text-green-700 border-green-200",
   },
 ];
+
+
 type FormValues = { answers: string[] };
 
 export default function Assessment({ id }: { id: string }) {
@@ -570,13 +572,13 @@ export default function Assessment({ id }: { id: string }) {
     defaultValues: { answers: Array(numQuestions).fill("") },
   });
 
-  const router = useRouter();
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [selectedAssessments, setSelectedAssessments] = useState<string[]>([]);
   const [currentAssessmentIndex, setCurrentAssessmentIndex] = useState(0);
   const [numAssessments, setNumAssessments] = useState(0);
+  const router = useRouter();
 
   useEffect(() => {
     const storedUserId = localStorage.getItem('tempUserId');
