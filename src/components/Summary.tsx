@@ -145,7 +145,7 @@ useEffect(() => {
                     </tbody>
                   </table>
                   <div class="print-important-text">
-                    Note: Scores are normalized to 0-100 scale. Overall Performance: ${overallScore}/100 (${getPerformanceLevel(overallScore)}). For counseling purposes only.
+                    Note: Scores are normalized to 0-100 scale For counseling purposes.
                   </div>
                 ` : `
                   <div class="print-consent-text">No assessments completed. Consent form submitted for counseling services only.</div>

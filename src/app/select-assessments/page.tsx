@@ -1,6 +1,7 @@
+// src/app/select-assessments/page.tsx
 "use client";
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -19,6 +20,8 @@ const assessments = [
 export default function SelectAssessments() {
   const [selectedAssessments, setSelectedAssessments] = useState<string[]>([]);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const userId = searchParams.get('userId');
 
   const handleCheckboxChange = (id: string) => {
     setSelectedAssessments(prev => 
@@ -26,24 +29,27 @@ export default function SelectAssessments() {
     );
   };
 
-  const handleProceed = () => {
-    if (selectedAssessments.length === 0) return;
-    
-    const consentData = JSON.parse(localStorage.getItem('tempConsentData') || '{}');
-    
-    // ✅ CREATE USER IN PERMANENT STORAGE
-    const userId = dataManager.saveUser({
-      ...consentData,
-      scores: {},
-    });
-    
-    // ✅ SAVE USER ID TEMPORARILY
-    localStorage.setItem('tempConsentData', JSON.stringify({ ...consentData, id: userId }));
-    localStorage.setItem('selectedAssessments', JSON.stringify(selectedAssessments.sort()));
-    
-    router.push(`/assessment/${selectedAssessments.sort()[0]}?userId=${userId}`);
-  };
+  const handleProceed = async () => {
+    if (selectedAssessments.length === 0 || !userId) {
+      console.error("Cannot proceed: No assessments selected or missing userId", {
+        userId,
+        selectedAssessments,
+      });
+      alert("Please select at least one assessment and ensure a valid user ID is provided.");
+      return;
+    }
 
+    try {
+      console.log("handleProceed - userId:", userId, "Type:", typeof userId);
+      await dataManager.updateSelectedAssessments(userId, selectedAssessments.sort());
+      const firstAssessment = selectedAssessments.sort()[0];
+      console.log("Redirecting to assessment:", firstAssessment, "with userId:", userId);
+      router.push(`/assessment/${firstAssessment}?userId=${userId}`);
+    } catch (error) {
+      console.error("Error in handleProceed:", error);
+      alert("Failed to proceed. Please try again.");
+    }
+  };
 
   return (
     <div className="min-h-screen p-4">
@@ -65,7 +71,7 @@ export default function SelectAssessments() {
           </div>
           <Button 
             onClick={handleProceed} 
-            disabled={selectedAssessments.length === 0} 
+            disabled={selectedAssessments.length === 0 || !userId} 
             className="w-full bg-blue-600 text-white"
           >
             Proceed to Assessment ({selectedAssessments.length} selected)
@@ -75,4 +81,3 @@ export default function SelectAssessments() {
     </div>
   );
 }
-

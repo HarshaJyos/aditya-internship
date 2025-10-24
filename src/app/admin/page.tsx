@@ -1,7 +1,7 @@
+// src/app/admin/page.tsx
 "use client";
 import { useEffect, useState, useMemo } from "react";
 import { dataManager, type AssessedUser } from "@/utils/dataManager";
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,10 +13,19 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  RefreshCw,
+  Printer,
+  RotateCcw,
+  Trash2,
+  LogOut,
+  AlertTriangle,
+} from "lucide-react";
 
 const assessmentNames: Record<string, string> = {
   "assessment-1": "Social Skills",
-  "assessment-2": "Emotional Awareness", 
+  "assessment-2": "Emotional Awareness",
   "assessment-3": "Stress Management",
   "assessment-4": "Team Dynamics",
   "assessment-5": "Motivation & Goals",
@@ -40,11 +49,6 @@ const levelColors: Record<PerformanceLevel, string> = {
   "At Risk": "bg-red-100 text-red-800 border-red-300",
 };
 
-// SAME printStyles AS BEFORE
-const logoUrl = "https://adityauniversity.in/static/media/au.f652eed91d8ba58a4968.webp";
-
-
-// ✅ PRINT STYLES (SHORTENED)
 const printStyles = `
   @media print {
     .print-hidden { display: none !important; }
@@ -87,35 +91,73 @@ const printStyles = `
   }
 `;
 
-
 export default function AdminPage() {
   const [users, setUsers] = useState<AssessedUser[]>([]);
   const [filterCounselor, setFilterCounselor] = useState<string>("all");
   const [filterLevel, setFilterLevel] = useState<string>("all");
-  const [filterScoreMin, setFilterScoreMin] = useState<number | undefined>(undefined);
-  const [filterScoreMax, setFilterScoreMax] = useState<number | undefined>(undefined);
-
-  // ✅ FIREBASE LOAD + DEBUG
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [filterScoreMin, setFilterScoreMin] = useState<number | undefined>(
+    undefined
+  );
+  const [filterScoreMax, setFilterScoreMax] = useState<number | undefined>(
+    undefined
+  );
+  const [password, setPassword] = useState<string>("");
+  const [error, setError] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  // Check session storage for authentication on mount
   useEffect(() => {
-    dataManager.getAllUsers().then(loadedUsers => {
-      setUsers(loadedUsers);
-    });
+    const authStatus = sessionStorage.getItem("adminAuthenticated");
+    if (authStatus === "true") {
+      setIsAuthenticated(true);
+    }
   }, []);
 
+  // Load users from Firebase and validate IDs
+  useEffect(() => {
+    if (isAuthenticated) {
+      dataManager
+        .getAllUsers()
+        .then((loadedUsers) => {
+          console.log("Loaded users:", loadedUsers);
+          const validUsers = loadedUsers.filter(
+            (user) => user.id && typeof user.id === "string"
+          );
+          if (validUsers.length !== loadedUsers.length) {
+            console.warn(
+              "Filtered out users with invalid IDs:",
+              loadedUsers.filter(
+                (user) => !user.id || typeof user.id !== "string"
+              )
+            );
+          }
+          setUsers(validUsers);
+        })
+        .catch((error) => {
+          console.error("Error loading users:", error);
+        });
+    }
+  }, [isAuthenticated]);
+
   const uniqueCounselors = useMemo(() => {
-    return Array.from(new Set(users.map(user => user.counselorName))).sort();
+    return Array.from(new Set(users.map((user) => user.counselorName))).sort();
   }, [users]);
 
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
       const scores = Object.values(user.scores);
-      const overallScore = scores.length > 0 ? Math.round(
-        scores.reduce((sum, s) => sum + (s.normalizedScore || 0), 0) / scores.length
-      ) : 0;
+      const overallScore =
+        scores.length > 0
+          ? Math.round(
+              scores.reduce((sum, s) => sum + (s.normalizedScore || 0), 0) /
+                scores.length
+            )
+          : 0;
 
       return (
         (filterCounselor === "all" || user.counselorName === filterCounselor) &&
-        (filterLevel === "all" || getPerformanceLevel(overallScore) === filterLevel) &&
+        (filterLevel === "all" ||
+          getPerformanceLevel(overallScore) === filterLevel) &&
         (filterScoreMin === undefined || overallScore >= filterScoreMin) &&
         (filterScoreMax === undefined || overallScore <= filterScoreMax)
       );
@@ -126,9 +168,9 @@ export default function AdminPage() {
     const printWindow = window.open("", "", "height=800,width=1000");
     if (printWindow) {
       let content = `<html><head><title>All Reports</title><style>${printStyles}</style></head><body><div class="print-content">`;
-      filteredUsers.forEach((user) => {
+      filteredUsers.forEach((user, index) => {
         content += `
-          <div class="print-page-break"></div>
+          ${index > 0 ? '<div class="print-page-break"></div>' : ""}
           <div class="print-section">
             <div class="print-header">
               <div class="print-logo"><img src="/logo.jpeg" style="width:100%;height:100%;object-fit:contain;" /></div>
@@ -145,12 +187,83 @@ export default function AdminPage() {
             <div class="print-section-title">Assessment Results</div>
             <table class="print-table">
               <thead><tr><th>Assessment</th><th style="text-align:center;">Score</th><th>Level</th></tr></thead>
-              <tbody>${Object.entries(user.scores).map(([id, scoreData]) => `<tr><td>${assessmentNames[id]}</td><td style="text-align:center;">${scoreData.normalizedScore}/100</td><td>${getPerformanceLevel(scoreData.normalizedScore)}</td></tr>`).join("")}</tbody>
+              <tbody>${Object.entries(user.scores)
+                .map(
+                  ([id, scoreData]) =>
+                    `<tr><td>${
+                      assessmentNames[id] || id
+                    }</td><td style="text-align:center;">${
+                      scoreData.normalizedScore
+                    }/100</td><td>${getPerformanceLevel(
+                      scoreData.normalizedScore
+                    )}</td></tr>`
+                )
+                .join("")}</tbody>
             </table>
-            <div class="print-signature-text">Signature: ${user.name}</div>
-          </div>`;
+            <div class="print-page-break"></div>
+          <!-- FULL CONSENT FORM -->
+              <div class="print-section">
+                <div class="print-section-title">INFORMED CONSENT FOR COUNSELING SERVICES</div>
+                <div class="print-consent-text">
+                  At Aditya University, we prioritize both your physical and mental well-being. For your physical health, we have partnered with Apollo, and for your mental well-being, our dedicated student counselors are here to support you. The University Counselling Centre at Surampalem provides a safe and confidential space for all students to explore personal concerns, develop coping strategies, and enhance overall well-being. You can attend multiple counseling sessions as per your wish.
+                </div>
+                <div class="print-important-text">
+                  Please sign this form only if you understand and agree with the information.
+                </div>
+
+                <div class="print-section-title">Welcome to Aditya University, Surampalem</div>
+                <div class="print-consent-text"><strong>What We Offer:</strong></div>
+                <ul class="print-list">
+                  <li>Individual counseling sessions</li>
+                  <li>Group therapy opportunities</li>
+                  <li>Workshops to enhance your skills</li>
+                </ul>
+
+                <div class="print-section-title">What is Counseling Support?</div>
+                <div class="print-consent-text">
+                  Counseling at the University Counselling Centre is a friendly and supportive space where you can share your thoughts, explore personal concerns, and develop strategies to enhance your well-being.
+                </div>
+                <div class="print-consent-text"><strong>Why It Helps:</strong></div>
+                <ul class="print-list">
+                  <li>Build confidence and coping skills</li>
+                  <li>Navigate academic and personal challenges</li>
+                  <li>Feel supported in a safe environment</li>
+                </ul>
+
+                <div class="print-section-title">Your Role in Counseling</div>
+                <ul class="print-list">
+                  <li>Attend sessions at your convenience</li>
+                  <li>Share your experiences for tailored support</li>
+                  <li>Let your counselor know if you need a different approach</li>
+                </ul>
+
+                <div class="print-section-title">Keeping Your Conversations Private</div>
+                <div class="print-consent-text">
+                  Everything you discuss is kept confidential, creating a safe space for you to open up.
+                </div>
+                <div class="print-consent-text"><strong>When We May Share:</strong></div>
+                <ul class="print-list">
+                  <li>If there's risk of harm to you or others</li>
+                  <li>With your permission, to university staff</li>
+                </ul>
+
+                <!-- ✅ FIXED SIGNATURE - TEXT ONLY -->
+                <div class="print-signature-text">
+                  Signature: ${user.name}
+                </div>
+              </div>
+
+              <!-- FOOTER -->
+              <div style="margin-top:15mm;text-align:center;font-size:9pt;color:#6b7280;border-top:1px solid #d1d5db;padding-top:5mm;">
+                <div><strong>Aditya University Counselling Centre</strong></div>
+                <div>Surampalem, Andhra Pradesh | Phone: (123) 456-7890</div>
+                <div>Email: counseling@adityauniversity.edu</div>
+                <div style="margin-top:2mm;font-weight:bold;">This document contains confidential information</div>
+              </div>
+            </div>
+           `;
       });
-      content += `<div style="margin-top:15mm;text-align:center;font-size:9pt;color:#6b7280;border-top:1px solid #d1d5db;padding-top:5mm;"><strong>Aditya University Counselling Centre</strong></div></div></body></html>`;
+      content += `</body></html>`;
       printWindow.document.write(content);
       printWindow.document.close();
       printWindow.print();
@@ -171,7 +284,9 @@ export default function AdminPage() {
           <div class="print-section">
             <div class="print-section-title">Summary Report</div>
             <table class="print-table">
-              <tr><th style="width:25%;">Student Name</th><td>${user.name}</td></tr>
+              <tr><th style="width:25%;">Student Name</th><td>${
+                user.name
+              }</td></tr>
               <tr><th>Roll Number</th><td>${user.rollNumber}</td></tr>
               <tr><th>Phone Number</th><td>${user.phoneNumber}</td></tr>
               <tr><th>Counselor Name</th><td>${user.counselorName}</td></tr>
@@ -180,34 +295,118 @@ export default function AdminPage() {
             <div class="print-section-title">Assessment Results</div>
             <table class="print-table">
               <thead><tr><th>Assessment</th><th style="text-align:center;">Score</th><th>Level</th></tr></thead>
-              <tbody>${Object.entries(user.scores).map(([id, s]) => `<tr><td>${assessmentNames[id]}</td><td style="text-align:center;">${s.normalizedScore}/100</td><td>${getPerformanceLevel(s.normalizedScore)}</td></tr>`).join("")}</tbody>
+              <tbody>${Object.entries(user.scores)
+                .map(
+                  ([id, s]) =>
+                    `<tr><td>${
+                      assessmentNames[id] || id
+                    }</td><td style="text-align:center;">${
+                      s.normalizedScore
+                    }/100</td><td>${getPerformanceLevel(
+                      s.normalizedScore
+                    )}</td></tr>`
+                )
+                .join("")}</tbody>
             </table>
+            <div class="print-important-text">
+                    Note: Scores are normalized to 0-100 scale For counseling purposes.
+                  </div>
           </div>
-          <div class="print-page-break"></div>
-          <div class="print-section">
-            <div class="print-section-title">INFORMED CONSENT</div>
-            <div class="print-consent-text">At Aditya University, we prioritize your well-being...</div>
-            <div class="print-signature-text">Signature: ${user.name}</div>
-          </div>
-        </div></body></html>`);
+          <!-- PAGE BREAK -->
+              <div class="print-page-break"></div>
+
+              <!-- FULL CONSENT FORM -->
+              <div class="print-section">
+                <div class="print-section-title">INFORMED CONSENT FOR COUNSELING SERVICES</div>
+                <div class="print-consent-text">
+                  At Aditya University, we prioritize both your physical and mental well-being. For your physical health, we have partnered with Apollo, and for your mental well-being, our dedicated student counselors are here to support you. The University Counselling Centre at Surampalem provides a safe and confidential space for all students to explore personal concerns, develop coping strategies, and enhance overall well-being. You can attend multiple counseling sessions as per your wish.
+                </div>
+                <div class="print-important-text">
+                  Please sign this form only if you understand and agree with the information.
+                </div>
+
+                <div class="print-section-title">Welcome to Aditya University, Surampalem</div>
+                <div class="print-consent-text"><strong>What We Offer:</strong></div>
+                <ul class="print-list">
+                  <li>Individual counseling sessions</li>
+                  <li>Group therapy opportunities</li>
+                  <li>Workshops to enhance your skills</li>
+                </ul>
+
+                <div class="print-section-title">What is Counseling Support?</div>
+                <div class="print-consent-text">
+                  Counseling at the University Counselling Centre is a friendly and supportive space where you can share your thoughts, explore personal concerns, and develop strategies to enhance your well-being.
+                </div>
+                <div class="print-consent-text"><strong>Why It Helps:</strong></div>
+                <ul class="print-list">
+                  <li>Build confidence and coping skills</li>
+                  <li>Navigate academic and personal challenges</li>
+                  <li>Feel supported in a safe environment</li>
+                </ul>
+
+                <div class="print-section-title">Your Role in Counseling</div>
+                <ul class="print-list">
+                  <li>Attend sessions at your convenience</li>
+                  <li>Share your experiences for tailored support</li>
+                  <li>Let your counselor know if you need a different approach</li>
+                </ul>
+
+                <div class="print-section-title">Keeping Your Conversations Private</div>
+                <div class="print-consent-text">
+                  Everything you discuss is kept confidential, creating a safe space for you to open up.
+                </div>
+                <div class="print-consent-text"><strong>When We May Share:</strong></div>
+                <ul class="print-list">
+                  <li>If there's risk of harm to you or others</li>
+                  <li>With your permission, to university staff</li>
+                </ul>
+
+                <!-- ✅ FIXED SIGNATURE - TEXT ONLY -->
+                <div class="print-signature-text">
+                  Signature: ${user.name}
+                </div>
+              </div>
+
+              <!-- FOOTER -->
+              <div style="margin-top:15mm;text-align:center;font-size:9pt;color:#6b7280;border-top:1px solid #d1d5db;padding-top:5mm;">
+                <div><strong>Aditya University Counselling Centre</strong></div>
+                <div>Surampalem, Andhra Pradesh | Phone: (123) 456-7890</div>
+                <div>Email: counseling@adityauniversity.edu</div>
+                <div style="margin-top:2mm;font-weight:bold;">This document contains confidential information</div>
+              </div>
+            </div></body></html>`);
       printWindow.document.close();
       printWindow.print();
     }
   };
 
   const handleRefresh = async () => {
-    const loadedUsers = await dataManager.getAllUsers();
-    setUsers(loadedUsers);
+    try {
+      const loadedUsers = await dataManager.getAllUsers();
+      const validUsers = loadedUsers.filter(
+        (user) => user.id && typeof user.id === "string"
+      );
+      console.log("Refreshed users:", validUsers);
+      setUsers(validUsers);
+    } catch (error) {
+      console.error("Error refreshing users:", error);
+    }
   };
 
   const handleClearAll = () => {
     if (confirm("Clear ALL data forever?")) {
-      dataManager.clearAll();
-      setUsers([]);
+      dataManager
+        .clearAll()
+        .then(() => {
+          console.log("All data cleared");
+          setUsers([]);
+        })
+        .catch((error) => {
+          console.error("Error clearing data:", error);
+        });
     }
   };
 
-  // ✅ PROFESSIONAL RESET
   const handleResetFilters = () => {
     setFilterCounselor("all");
     setFilterLevel("all");
@@ -215,23 +414,124 @@ export default function AdminPage() {
     setFilterScoreMax(undefined);
   };
 
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/verify-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setIsAuthenticated(true);
+        sessionStorage.setItem("adminAuthenticated", "true");
+        setPassword("");
+      } else {
+        setError(data.error || "Incorrect password");
+      }
+    } catch (error) {
+      console.error("Error verifying password:", error);
+      setError("Failed to verify password. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold text-center text-gray-800">
+              Admin Access
+            </CardTitle>
+            <p className="text-center text-sm text-gray-600">
+              Enter the admin password to access the dashboard
+            </p>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-600 mb-1 block">
+                  Password
+                </label>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter admin password"
+                  className="h-10"
+                  disabled={isLoading}
+                />
+              </div>
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              <Button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700"
+                disabled={isLoading || !password}
+              >
+                {isLoading ? "Verifying..." : "Submit"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen p-4 bg-white">
-      <style jsx global>{printStyles}</style>
+      <style jsx global>
+        {printStyles}
+      </style>
       <Card className="max-w-full">
         <CardHeader className="text-center border-b">
-          <CardTitle className="text-xl font-bold text-gray-800">Admin Dashboard</CardTitle>
+          <CardTitle className="text-xl font-bold text-gray-800">
+            Admin Dashboard
+          </CardTitle>
           <div className="text-sm text-gray-600 mb-2">
-            📊 Total: <span className="font-semibold">{users.length}</span> | 
-            🔍 Showing: <span className="font-semibold">{filteredUsers.length}</span>
+            📊 Total: <span className="font-semibold">{users.length}</span> | 🔍
+            Showing:{" "}
+            <span className="font-semibold">{filteredUsers.length}</span>
           </div>
           <div className="flex flex-wrap gap-2 justify-center mt-4">
-            <Button onClick={handleRefresh} variant="outline" size="sm">🔄 Refresh</Button>
-            <Button onClick={handlePrintAll} disabled={!filteredUsers.length} size="sm" className="bg-blue-600 hover:bg-blue-700">
-              📄 Print All ({filteredUsers.length})
+            <Button onClick={handleRefresh} variant="outline" size="sm">
+              <RefreshCw className="mr-2 h-4 w-4" /> Refresh
             </Button>
-            <Button onClick={handleResetFilters} variant="outline" size="sm">🔄 Reset</Button>
-            <Button onClick={handleClearAll} variant="destructive" size="sm">🗑️ Clear All</Button>
+            <Button
+              onClick={handlePrintAll}
+              disabled={!filteredUsers.length}
+              size="sm"
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Printer className="mr-2 h-4 w-4" /> Print All (
+              {filteredUsers.length})
+            </Button>
+            <Button onClick={handleResetFilters} variant="outline" size="sm">
+              <RotateCcw className="mr-2 h-4 w-4" /> Reset
+            </Button>
+            <Button onClick={handleClearAll} variant="destructive" size="sm">
+              <Trash2 className="mr-2 h-4 w-4" /> Clear All
+            </Button>
+            <Button
+              onClick={() => {
+                sessionStorage.removeItem("adminAuthenticated");
+                setIsAuthenticated(false);
+              }}
+              variant="outline"
+              size="sm"
+              className="text-red-600 border-red-600 hover:bg-red-50"
+            >
+              <LogOut className="mr-2 h-4 w-4" /> Logout
+            </Button>
           </div>
         </CardHeader>
 
@@ -239,14 +539,19 @@ export default function AdminPage() {
           <div className="p-4 bg-gray-50 border-b">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">Counselor</label>
-                <Select value={filterCounselor} onValueChange={setFilterCounselor}>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">
+                  Counselor
+                </label>
+                <Select
+                  value={filterCounselor}
+                  onValueChange={setFilterCounselor}
+                >
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder="All Counselors" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Counselors</SelectItem>
-                    {uniqueCounselors.map(counselor => (
+                    {uniqueCounselors.map((counselor) => (
                       <SelectItem key={counselor} value={counselor}>
                         {counselor}
                       </SelectItem>
@@ -256,7 +561,9 @@ export default function AdminPage() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">Level</label>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">
+                  Level
+                </label>
                 <Select value={filterLevel} onValueChange={setFilterLevel}>
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder="All Levels" />
@@ -265,14 +572,18 @@ export default function AdminPage() {
                     <SelectItem value="all">All Levels</SelectItem>
                     <SelectItem value="Excellent">Excellent</SelectItem>
                     <SelectItem value="Good">Good</SelectItem>
-                    <SelectItem value="Needs Improvement">Needs Improvement</SelectItem>
+                    <SelectItem value="Needs Improvement">
+                      Needs Improvement
+                    </SelectItem>
                     <SelectItem value="At Risk">At Risk</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">Min Score</label>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">
+                  Min Score
+                </label>
                 <Input
                   type="number"
                   placeholder="0"
@@ -288,7 +599,9 @@ export default function AdminPage() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">Max Score</label>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">
+                  Max Score
+                </label>
                 <Input
                   type="number"
                   placeholder="100"
@@ -310,30 +623,64 @@ export default function AdminPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="border p-3 text-left font-semibold">Name</th>
-                  <th className="border p-3 text-left font-semibold">Roll No</th>
-                  <th className="border p-3 text-left font-semibold">Counselor</th>
+                  <th className="border p-3 text-left font-semibold">
+                    Roll No
+                  </th>
+                  <th className="border p-3 text-left font-semibold">
+                    Counselor
+                  </th>
                   <th className="border p-3 text-left font-semibold">Date</th>
-                  <th className="border p-3 text-left font-semibold">Overall Score</th>
+                  <th className="border p-3 text-left font-semibold">
+                    Overall Score
+                  </th>
                   <th className="border p-3 text-left font-semibold">Level</th>
-                  <th className="border p-3 text-left font-semibold">Actions</th>
+                  <th className="border p-3 text-left font-semibold">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {filteredUsers.map((user) => {
+                  if (!user.id) {
+                    console.warn("User with missing ID:", user);
+                    return null; // Skip users with missing IDs
+                  }
                   const scores = Object.values(user.scores);
-                  const overallScore = scores.length > 0 ? Math.round(
-                    scores.reduce((sum, s) => sum + (s.normalizedScore || 0), 0) / scores.length
-                  ) : 0;
+                  const overallScore =
+                    scores.length > 0
+                      ? Math.round(
+                          scores.reduce(
+                            (sum, s) => sum + (s.normalizedScore || 0),
+                            0
+                          ) / scores.length
+                        )
+                      : 0;
                   const level = getPerformanceLevel(overallScore);
                   return (
                     <tr key={user.id} className="hover:bg-gray-50">
                       <td className="border p-3">{user.name}</td>
                       <td className="border p-3">{user.rollNumber}</td>
                       <td className="border p-3">{user.counselorName}</td>
-                      <td className="border p-3">{new Date(user.dateCompleted).toLocaleDateString()}</td>
-                      <td className="border p-3 font-bold">{overallScore}/100</td>
-                      <td className="border p-3"><Badge className={`${levelColors[level]} px-2 py-1`}>{level}</Badge></td>
-                      <td className="border p-3"><Button size="sm" onClick={() => handlePrintSingle(user)} className="h-8">Print</Button></td>
+                      <td className="border p-3">
+                        {new Date(user.dateCompleted).toLocaleDateString()}
+                      </td>
+                      <td className="border p-3 font-bold">
+                        {overallScore}/100
+                      </td>
+                      <td className="border p-3">
+                        <Badge className={`${levelColors[level]} px-2 py-1`}>
+                          {level}
+                        </Badge>
+                      </td>
+                      <td className="border p-3">
+                        <Button
+                          size="sm"
+                          onClick={() => handlePrintSingle(user)}
+                          className="h-8"
+                        >
+                          Print
+                        </Button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -342,10 +689,16 @@ export default function AdminPage() {
           </div>
 
           {filteredUsers.length === 0 && users.length > 0 && (
-            <div className="text-center p-8 text-orange-600">❌ Filters too strict! Try broader ranges or reset.</div>
+            <div className="text-center p-8 text-orange-600 flex items-center justify-center">
+              <AlertTriangle className="mr-2 h-5 w-5" /> Filters too strict! Try
+              broader ranges or reset.
+            </div>
           )}
           {users.length === 0 && (
-            <div className="text-center p-8 text-red-600">❌ No data in localStorage. Complete an assessment first!</div>
+            <div className="text-center p-8 text-red-600 flex items-center justify-center">
+              <AlertTriangle className="mr-2 h-5 w-5" /> No data in Firebase.
+              Complete an assessment first!
+            </div>
           )}
         </CardContent>
       </Card>

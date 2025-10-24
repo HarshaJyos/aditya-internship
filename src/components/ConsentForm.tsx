@@ -1,3 +1,4 @@
+// src/components/ConsentForm.tsx
 "use client";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -5,9 +6,8 @@ import * as z from "zod";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import Image from 'next/image';
-
 import { Card, CardContent } from "@/components/ui/card";
-import {  FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +25,6 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-// ✅ ALL SECTIONS FROM OLD FORM (SIMPLE UI)
 const sections = [
   {
     title: "Welcome to Aditya University, Surampalem",
@@ -99,6 +98,7 @@ const sections = [
   },
 ];
 
+
 export default function ConsentForm() {
   const router = useRouter();
   const form = useForm<FormValues>({
@@ -112,29 +112,27 @@ export default function ConsentForm() {
     },
   });
 
-  // src/components/ConsentForm.tsx
-const onSubmit = async (data: FormValues) => {
-  const submitData = {
-    name: data.name,
-    rollNumber: data.rollNumber,
-    phoneNumber: data.phoneNumber,
-    counselorName: data.counselorName,
-    signatureDate: format(data.signatureDate, "MM/dd/yyyy"),
-    // Add properties required by saveUser / AssessedUser (omitting id)
+  const onSubmit = async (data: FormValues) => {
+    const submitData = {
+      name: data.name,
+      rollNumber: data.rollNumber,
+      phoneNumber: data.phoneNumber,
+      counselorName: data.counselorName,
+      signatureDate: format(data.signatureDate, "MM/dd/yyyy"),
       selectedAssessments: [],
       scores: {},
       dateCompleted: new Date().toISOString(),
+    };
+
+    try {
+      const userId = await dataManager.saveUser(submitData); // Await Firebase save
+      console.log("Redirecting to select-assessments with userId:", userId);
+      router.push(`/select-assessments?userId=${userId}`);
+    } catch (error) {
+      console.error("Error saving consent:", error);
+      alert("Failed to save. Please try again.");
+    }
   };
-
-  try {
-    const userId = await dataManager.saveUser(submitData); // ← AWAIT HERE
-    router.push(`/select-assessments?userId=${userId}`);
-  } catch (error) {
-    console.error("Error saving consent:", error);
-    alert("Failed to save. Please try again.");
-  }
-};
-
 
   return (
     <div className="min-h-screen p-6 bg-white">
@@ -144,11 +142,9 @@ const onSubmit = async (data: FormValues) => {
           body { font-size: 12pt; margin: 0; }
         }
       `}</style>
-      
       <div className="max-w-4xl mx-auto">
         <Card className="border-0 shadow-none print:shadow-none">
           <CardContent className="p-0">
-            {/* ✅ HEADER - SIMPLE & PROFESSIONAL */}
             <div className="text-center py-8 border-b-2 border-gray-200">
               <div className="inline-block w-16 h-16 mb-4">
                 <Image 
@@ -167,8 +163,6 @@ const onSubmit = async (data: FormValues) => {
                 <Badge className="mt-2 border-blue-600 text-blue-600 text-xs">Confidential</Badge>
               </div>
             </div>
-
-            {/* ✅ INTRODUCTION - SIMPLE */}
             <div className="p-6 bg-gray-50 border-b border-gray-200">
               <p className="text-sm text-gray-700 leading-relaxed mb-4">
                 At Aditya University, we prioritize both your physical and mental well-being. For your physical health, we have partnered with Apollo, and for your mental well-being, our dedicated student counselors are here to support you. The University Counselling Centre provides a safe and confidential space for all students. You can attend multiple counseling sessions as per your wish.
@@ -179,8 +173,6 @@ const onSubmit = async (data: FormValues) => {
                 </p>
               </div>
             </div>
-
-            {/* ✅ SECTIONS - MINIMALISTIC */}
             <div className="p-6 space-y-4">
               {sections.map((section, index) => (
                 <div key={index} className="border border-gray-200 rounded-lg bg-white">
@@ -191,8 +183,6 @@ const onSubmit = async (data: FormValues) => {
                 </div>
               ))}
             </div>
-
-            {/* ✅ FORM - CLEAN & SIMPLE */}
             <div className="p-6 border-t-2 border-blue-600">
               <FormProvider {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -200,15 +190,11 @@ const onSubmit = async (data: FormValues) => {
                     <h2 className="text-xl font-bold text-gray-900 mb-2">Your Information</h2>
                     <Badge className="bg-blue-100 text-blue-800 text-xs">Please fill all fields</Badge>
                   </div>
-
-                  {/* ✅ CONSENT CHECKBOX */}
                   <Alert className="border-blue-200 bg-blue-50 mb-6">
                     <AlertDescription className="text-sm text-blue-800">
                       I have read and understood the information above and agree to proceed with counseling at the University Counselling Centre.
                     </AlertDescription>
                   </Alert>
-
-                  {/* ✅ INPUT FIELDS - SIMPLE */}
                   <div className="space-y-4 bg-gray-50 p-4 rounded-lg border">
                     <FormField
                       control={form.control}
@@ -271,28 +257,26 @@ const onSubmit = async (data: FormValues) => {
                         </FormItem>
                       )}
                     />
+                    <FormField
+                      control={form.control}
+                      name="signatureDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-semibold text-gray-800">Date</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="date"
+                              {...field}
+                              value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
+                              onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
+                              className="h-10 text-base border-gray-300"
+                            />
+                          </FormControl>
+                          <FormMessage className="text-xs" />
+                        </FormItem>
+                      )}
+                    />
                   </div>
-
-                  <FormField
-                    control={form.control}
-                    name="signatureDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-semibold text-gray-800">Date</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="date"
-                            {...field}
-                            value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
-                            onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
-                            className="h-10 text-base border-gray-300"
-                          />
-                        </FormControl>
-                        <FormMessage className="text-xs" />
-                      </FormItem>
-                    )}
-                  />
-
                   <div className="flex justify-center print-hidden pt-4">
                     <Button type="submit" className="w-full max-w-xs bg-blue-600 text-white h-10">
                       Submit Consent & Continue
@@ -307,4 +291,3 @@ const onSubmit = async (data: FormValues) => {
     </div>
   );
 }
-
