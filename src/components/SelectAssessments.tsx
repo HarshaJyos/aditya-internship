@@ -28,16 +28,19 @@ export default function SelectAssessments() {
     );
   };
 
-  const handleProceed = async () => {
-    if (selectedAssessments.length === 0 || !userId) return;
-    
-    try {
-      await dataManager.updateSelectedAssessments(userId, selectedAssessments.sort());
-      router.push(`/assessment/${selectedAssessments.sort()[0]}?userId=${userId}`);
-    } catch (error) {
-      console.error("❌ Error updating selected:", error);
-    }
-  };
+  // src/app/select-assessments/page.tsx
+const handleProceed = async () => {
+  if (selectedAssessments.length === 0 || !userId) return;
+
+  try {
+    await dataManager.updateSelectedAssessments(userId, selectedAssessments.sort());
+    const firstAssessment = selectedAssessments.sort()[0];
+    router.push(`/assessment/${firstAssessment}?userId=${userId}`);
+  } catch (error) {
+    console.error("Error saving selections:", error);
+    alert("Failed to proceed. Please try again.");
+  }
+};
 
 
   return (

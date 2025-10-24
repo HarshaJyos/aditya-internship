@@ -72,17 +72,15 @@ export default function Summary() {
   const [user, setUser] = useState<AssessedUser | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  useEffect(() => {
-    const userId = searchParams.get("userId");
-    if (userId) {
-      dataManager.getUserById(userId).then(foundUser => {
-        setUser(foundUser);
-        setIsLoaded(true);
-      });
-    } else {
-      setIsLoaded(true);
-    }
-  }, [searchParams]);
+  // src/components/Summary.tsx
+useEffect(() => {
+  const userId = searchParams.get("userId");
+  if (userId) {
+    dataManager.getUserById(userId).then(setUser).finally(() => setIsLoaded(true));
+  } else {
+    setIsLoaded(true);
+  }
+}, [searchParams]);
 
   if (!isLoaded) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;

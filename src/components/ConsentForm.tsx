@@ -112,26 +112,28 @@ export default function ConsentForm() {
     },
   });
 
-  const onSubmit = async (data: FormValues) => {
-    const submitData = {
-      name: data.name,
-      rollNumber: data.rollNumber,
-      phoneNumber: data.phoneNumber,
-      counselorName: data.counselorName,
-      signatureDate: format(data.signatureDate, "MM/dd/yyyy"),
-      // Add properties required by saveUser / AssessedUser (omitting id)
+  // src/components/ConsentForm.tsx
+const onSubmit = async (data: FormValues) => {
+  const submitData = {
+    name: data.name,
+    rollNumber: data.rollNumber,
+    phoneNumber: data.phoneNumber,
+    counselorName: data.counselorName,
+    signatureDate: format(data.signatureDate, "MM/dd/yyyy"),
+    // Add properties required by saveUser / AssessedUser (omitting id)
       selectedAssessments: [],
       scores: {},
       dateCompleted: new Date().toISOString(),
-    };
-    try {
-      const userId = await dataManager.saveUser(submitData);
-      router.push(`/select-assessments?userId=${userId}`);
-    } catch (error) {
-      console.error("❌ Error saving consent:", error);
-      // Handle error (e.g., show toast)
-    }
   };
+
+  try {
+    const userId = await dataManager.saveUser(submitData); // ← AWAIT HERE
+    router.push(`/select-assessments?userId=${userId}`);
+  } catch (error) {
+    console.error("Error saving consent:", error);
+    alert("Failed to save. Please try again.");
+  }
+};
 
 
   return (

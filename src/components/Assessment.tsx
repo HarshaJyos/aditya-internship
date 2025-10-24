@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useState, useEffect } from "react";
 import { dataManager, type AssessmentScore } from "@/utils/dataManager";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,7 @@ import {
   FormLabel,
   FormControl,
 } from "@/components/ui/form";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "@/firebase";
+
 
 const assessmentQuestions: Record<
   string,
@@ -569,8 +568,7 @@ const likertOptions = [
 
 type FormValues = { answers: string[] };
 
-export default function Assessment({ id }: { id: string }) {
-  const currentAssessment = assessmentQuestions[id];
+export default function Assessment({ id }: { id: string }) {  const currentAssessment = assessmentQuestions[id];
   const questions = currentAssessment.questions;
   const numQuestions = questions.length;
 
@@ -580,30 +578,35 @@ export default function Assessment({ id }: { id: string }) {
     ),
     defaultValues: { answers: Array(numQuestions).fill("") },
   });
-
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const searchParams = useSearchParams();
+  const urlUserId = searchParams.get("userId"); // ← From URL
   const [userId, setUserId] = useState<string | null>(null);
   const [selectedAssessments, setSelectedAssessments] = useState<string[]>([]);
   const [currentAssessmentIndex, setCurrentAssessmentIndex] = useState(0);
   const [numAssessments, setNumAssessments] = useState(0);
-  const router = useRouter();
+    const router = useRouter();
 
-  // Assessment.tsx – useEffect
-useEffect(() => {
-  const init = async () => {
-    await import("@/firebase").then(m => m.isAuthReady ? null : new Promise<void>(r => {
-      const unsub = onAuthStateChanged(auth, () => { unsub(); r(); });
-    }));
-    const storedUserId = localStorage.getItem('tempUserId');
-    const storedSelected = JSON.parse(localStorage.getItem('tempSelectedAssessments') || "[]");
-    setUserId(storedUserId);
-    setSelectedAssessments(storedSelected);
-    setNumAssessments(storedSelected.length);
-    setCurrentAssessmentIndex(storedSelected.indexOf(id));
-  };
-  init();
-}, [id]);
+
+
+
+
+  useEffect(() => {
+    const load = async () => {
+      if (!urlUserId) return;
+
+      const user = await dataManager.getUserById(urlUserId);
+      if (user) {
+        setUserId(urlUserId);
+        setSelectedAssessments(user.selectedAssessments);
+        setNumAssessments(user.selectedAssessments.length);
+        setCurrentAssessmentIndex(user.selectedAssessments.indexOf(id));
+      }
+    };
+    load();
+  }, [urlUserId, id]);
 
   const onAnswerChange = (value: string, index: number) => {
     form.setValue(`answers.${index}`, value);
@@ -613,51 +616,36 @@ useEffect(() => {
   };
 
   const calculateAndSaveScore = async (data: FormValues) => {
-    const rawScore = data.answers.reduce(
-      (total, answer, index) => total + questions[index].scoring[answer],
-      0
-    );
+    if (!userId) throw new Error("No userId");
+
+    const rawScore = data.answers.reduce((sum, ans, i) => sum + questions[i].scoring[ans], 0);
     const minScore = numQuestions * 1;
     const maxScore = numQuestions * 5;
-    const normalizedScore = Math.round(
-      ((rawScore - minScore) / (maxScore - minScore)) * 100
-    );
+    const normalizedScore = Math.round(((rawScore - minScore) / (maxScore - minScore)) * 100);
 
-    const score: AssessmentScore = {
-      id,
-      rawScore,
-      normalizedScore,
-      date: new Date().toISOString(),
-    };
+    const score: AssessmentScore = { id, rawScore, normalizedScore, date: new Date().toISOString() };
 
-    // ✅ SAVE TO FIREBASE
-    await dataManager.updateUserScores(userId!, { [id]: score });
-
+    await dataManager.updateUserScores(userId, id, score); // ← AWAIT
     return normalizedScore;
   };
 
-  const progressPercentage = Math.round(
-    ((currentQuestion + 1) / numQuestions) * 100
-  );
-
   const handleComplete = async () => {
-    if (!form.getValues("answers")[currentQuestion]) return;
-    if (!userId) {
-      console.error("No userId – cannot save score");
-      // Optionally redirect to consent
-      router.push("/consent");
-      return;
-    }
+    if (!form.getValues("answers")[currentQuestion] || !userId) return;
+
     setIsSubmitting(true);
-    await calculateAndSaveScore(form.getValues());
+    try {
+      await calculateAndSaveScore(form.getValues());
+      const nextIndex = currentAssessmentIndex + 1;
 
-    await calculateAndSaveScore(form.getValues());
-    const nextIndex = currentAssessmentIndex + 1;
-
-    if (nextIndex < numAssessments) {
-      router.push(`/assessment/${selectedAssessments[nextIndex]}`);
-    } else {
-      router.push("/summary");
+      if (nextIndex < numAssessments) {
+        router.push(`/assessment/${selectedAssessments[nextIndex]}?userId=${userId}`);
+      } else {
+        router.push(`/summary?userId=${userId}`);
+      }
+    } catch (error) {
+      console.error("Save failed:", error);
+      alert("Failed to save score. Please try again.");
+      setIsSubmitting(false);
     }
   };
 
@@ -668,7 +656,10 @@ useEffect(() => {
           <CardTitle className="text-3xl font-bold text-blue-800">
             {currentAssessment.name}
           </CardTitle>
-          <Progress value={progressPercentage} className="w-full h-3 mt-4" />
+          <Progress
+            value={Math.round(((currentQuestion + 1) / Math.max(1, numQuestions)) * 100)}
+            className="w-full h-3 mt-4"
+          />
           <p className="text-lg mt-2">
             Question {currentQuestion + 1} of {numQuestions}
           </p>
