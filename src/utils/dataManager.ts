@@ -1,3 +1,4 @@
+
 import { db, auth, isAuthReady } from "@/firebase";
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
@@ -5,7 +6,7 @@ import { onAuthStateChanged } from "firebase/auth";
 export interface AssessmentScore {
   id: string;
   rawScore: number;
-  normalizedScore: number;
+  subscales?: Record<string, number>;
   date: string;
 }
 
@@ -16,7 +17,7 @@ export interface AssessedUser {
   phoneNumber: string;
   counselorName: string;
   signatureDate: string;
-  selectedAssessments: string[]; // NEW - Store selected here
+  selectedAssessments: string[];
   scores: Record<string, AssessmentScore>;
   dateCompleted: string;
 }
